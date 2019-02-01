@@ -48,7 +48,7 @@ module Alphabetize
       #   line = chunk[gem]
       #   file.puts(line)
       # end
-      file.puts("")
+      file.puts("") unless chunk[:type] == :static
     end
 
     file.close
@@ -57,63 +57,43 @@ module Alphabetize
 
   private
   def self.make_chunky(lines)
+    rubygems_chunks = []
     chunks = []
-
+    comment_chunks = []
     chunk = {}
     chunk_gem_lines = []
     lines.each do |line|
       puts "*            Processing line: #{line}" if @@options[:mode] == :verbose
       if line != "\n"
-        if line.match(/##/) # static chunk
-          chunk[:type] = :static
+        if line.match(/^(source|ruby)/)
+          rubygems_chunks << { type: :static, gem_hash: { _: line } }
+        elsif line.match(/\#/) # static chunk
           puts "Thinks its static" if @@options[:mode] == :verbose
-          chunk[:gem_hash] = gem_hash([line])
-          chunks << chunk
-          chunk = {}
-          chunk_gem_lines = []
-
+          comment_chunks << { type: :static, gem_hash: { _: line } }
         elsif line.match(/group (.)* do/) || line.match(/group/) # official start of a group
           puts 'Thinks it\'s a group (start)' if @@options[:mode] == :verbose
           chunk[:type] = :group
           chunk[:header] = line
-
         elsif line.match(/^end/) # official end of a group
           puts "Thinks its a group (end)" if @@options[:mode] == :verbose
           chunk[:gem_hash] = gem_hash(chunk_gem_lines)
           chunks << chunk
           chunk = {}
           chunk_gem_lines = []
-
         else # regular gem line
           chunk[:type] = :regular if chunk == {} # start of a regualr chunk
           chunk_gem_lines << line
         end
-
       elsif line == "\n" and chunk != {}  # this is the end of some regular chunk
         puts "Thinks its regular" if @@options[:mode] == :verbose
         chunk[:gem_hash] = gem_hash(chunk_gem_lines)
         chunks << chunk
         chunk = {}
         chunk_gem_lines = []
-
       else # two new line characters in a row
         puts "**** Skipping line: #{line}" if @@options[:mode] == :verbose
         # do nothing
       end
-
-
-      # if line contains '##'
-      #   mark chunk as :static
-      # if line contains 'do'
-      #   mark chunk as :group
-      #
-      # if line == "\n" and !chunk_gem_lines.empty?
-      #   chunk[:gem_hash] = gem_hash(chunk_gem_lines)
-      #   chunks << chunk
-      #   chunk_gem_lines = [] # reset chunk lines
-      # else
-      #   chunk_gem_lines << line if line != "\n"
-      # end
     end
 
     if chunk != {}
@@ -121,7 +101,7 @@ module Alphabetize
       chunks << chunk
     end
 
-    chunks
+    rubygems_chunks + chunks + comment_chunks
   end
 
   def self.gem_hash(lines)
@@ -130,12 +110,13 @@ module Alphabetize
     lines.each do |line|
       puts "Line: #{line}" if @@options[:mode] == :verbose
       match_data = line.scan(/(\"([^"]*)\")|(\'([^']*)\')/)
+
       # The gem is either the second element or the 4th element of the array
       next if match_data.empty?
       gem ||= match_data[0][1]
       gem ||= match_data[0].last
       puts "Found gem: #{gem}" if @@options[:mode] == :verbose
-      hash[gem] = line
+      hash[gem] = line.gsub('"', "'")
     end
 
     hash
