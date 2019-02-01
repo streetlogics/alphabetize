@@ -1,11 +1,11 @@
 $:.unshift File.dirname(__FILE__) # For use/testing when no gem is installed
 
 # The Gemfile is parsed into    file_chunks array
-# Each chunk has the following attributes:  
+# Each chunk has the following attributes:
 #   :type - :static (don't sort them), :regular, :group (official group, use the header, end correctly)
 #   :header - the line that prepends the chunk
 #   :gem_hash - the hash of gems that belong to this chunk
-# 
+#
 
 module Alphabetize
   VERSION = "0.1.3"
@@ -72,12 +72,13 @@ module Alphabetize
           chunk = {}
           chunk_gem_lines = []
 
-        elsif line.match(/do/) # official start of a group
+        elsif line.match(/group (.)* do/) || line.match(/group/) # official start of a group
+          puts 'Thinks it\'s a group (start)' if @@options[:mode] == :verbose
           chunk[:type] = :group
           chunk[:header] = line
 
         elsif line.match(/^end/) # official end of a group
-          puts "Thinks its a group" if @@options[:mode] == :verbose
+          puts "Thinks its a group (end)" if @@options[:mode] == :verbose
           chunk[:gem_hash] = gem_hash(chunk_gem_lines)
           chunks << chunk
           chunk = {}
@@ -105,7 +106,7 @@ module Alphabetize
       #   mark chunk as :static
       # if line contains 'do'
       #   mark chunk as :group
-      # 
+      #
       # if line == "\n" and !chunk_gem_lines.empty?
       #   chunk[:gem_hash] = gem_hash(chunk_gem_lines)
       #   chunks << chunk
@@ -130,6 +131,7 @@ module Alphabetize
       puts "Line: #{line}" if @@options[:mode] == :verbose
       match_data = line.scan(/(\"([^"]*)\")|(\'([^']*)\')/)
       # The gem is either the second element or the 4th element of the array
+      next if match_data.empty?
       gem ||= match_data[0][1]
       gem ||= match_data[0].last
       puts "Found gem: #{gem}" if @@options[:mode] == :verbose
